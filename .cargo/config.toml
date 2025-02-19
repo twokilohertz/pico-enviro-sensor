@@ -1,0 +1,36 @@
+[alias]
+
+build-arm = "build --target=thumbv8m.main-none-eabihf"
+build-riscv = "build --target=riscv32imac-unknown-none-elf"
+
+run-arm = "run --target=thumbv8m.main-none-eabihf"
+run-riscv = "run --target=riscv32imac-unknown-none-elf"
+
+[build]
+target = "thumbv8m.main-none-eabihf"
+
+[target.thumbv8m.main-none-eabihf]
+rustflags = [
+    "-C",
+    "link-arg=--nmagic",
+    "-C",
+    "link-arg=-Tlink.x",
+    # "-C",
+    # "link-arg=-Tdefmt.x",
+    "-C",
+    "target-cpu=cortex-m33",
+]
+
+runner = "picotool load -u -v -x -t elf"
+
+[target.riscv32imac-unknown-none-elf]
+rustflags = [
+    "-C",
+    "link-arg=--nmagic",
+    "-C",
+    "link-arg=-Trp235x_riscv.x",
+    # "-C",
+    # "link-arg=-Tdefmt.x",
+]
+
+runner = "picotool load -u -v -x -t elf"
