@@ -3,6 +3,7 @@ name = "pico-enviro-sensor"
 description = "Firmware for RPi Pico 2 W-based environment sensor"
 authors = ["Adam Macdonald"]
 homepage = "https://github.com/twokilohertz/pico-enviro-sensor"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
