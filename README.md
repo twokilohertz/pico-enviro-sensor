@@ -16,7 +16,7 @@ This firmware, written in Rust using embedded-hal ([rp235x-hal](https://crates.i
 
 This build system assumes the environment variables: `PICO_BOARD`, `PICO_PLATFORM` & `PICO_SDK_PATH` are set. `picotool` should also be available in the `PATH`.
 
-The [env-vars.sh](./scripts/env-vars.sh) script sets these values to `pico2_w`, `rp2350-arm-s` and my personal Pico SDK path, respectively.
+The [env-vars.sh](./scripts/env-vars.sh) script sets these values to `pico2_w`, `rp2350-arm-s` and my personal Pico SDK path, respectively. The environment variable definitions in this file can be set with `source ./scripts/env-vars.sh`.
 
 ### Compiling & running
 
