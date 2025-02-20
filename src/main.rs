@@ -1,21 +1,25 @@
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
+use embedded_hal::delay::DelayNs;
+use fugit::RateExtU32;
+use panic_halt as _; // Needed so its built & linked correctly
 
 // Alias for our HAL crate
 use rp235x_hal as hal;
 
-// Some things we need
-use embedded_hal::delay::DelayNs;
-use embedded_hal::digital::OutputPin;
+// RP235x HAL
+use hal::uart::DataBits;
+use hal::uart::StopBits;
+use hal::uart::UartConfig;
+use hal::uart::UartPeripheral;
+use hal::Clock;
+
+mod constants;
 
 #[link_section = ".start_block"]
 #[used]
 pub static IMAGE_DEF: hal::block::ImageDef = hal::block::ImageDef::secure_exe();
-
-/// Pico 2 W on-board crystal oscillator frequency (AEL 12.0)
-const XTAL_FREQ_HZ: u32 = 12_000_000u32;
 
 #[hal::entry]
 fn main() -> ! {
@@ -24,7 +28,7 @@ fn main() -> ! {
     let mut watchdog = hal::Watchdog::new(peripherals.WATCHDOG);
 
     let clocks = hal::clocks::init_clocks_and_plls(
-        XTAL_FREQ_HZ,
+        constants::XTAL_FREQ_HZ,
         peripherals.XOSC,
         peripherals.CLOCKS,
         peripherals.PLL_SYS,
@@ -45,12 +49,18 @@ fn main() -> ! {
         &mut peripherals.RESETS,
     );
 
-    let mut led_pin = pins.gpio19.into_push_pull_output();
+    let uart0_pins = (pins.gpio0.into_function(), pins.gpio1.into_function());
+
+    let uart = UartPeripheral::new(peripherals.UART0, uart0_pins, &mut peripherals.RESETS)
+        .enable(
+            UartConfig::new(9600_u32.Hz(), DataBits::Eight, None, StopBits::One),
+            clocks.peripheral_clock.freq(),
+        )
+        .unwrap();
+
     loop {
-        led_pin.set_high().unwrap();
-        timer.delay_ms(1000);
-        led_pin.set_low().unwrap();
-        timer.delay_ms(1000);
+        uart.write_full_blocking(b"hello, world!\r\n");
+        timer.delay_ms(500);
     }
 }
 
