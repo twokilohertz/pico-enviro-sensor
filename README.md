@@ -11,6 +11,9 @@ This firmware, written in Rust using embedded-hal ([rp235x-hal](https://crates.i
 - RPi picotool: https://github.com/raspberrypi/picotool
 - ARM bare metal compiler toolchain
     - `arm-none-eabi-gcc` (& `arm-none-eabi-newlib`) on Arch Linux, your system may have different package names
+- The ARMv8 or RISC-V Rust toolchain:
+  - ARMv8: `rustup target add thumbv8m.main-none-eabihf`
+  - RISC-V: `rustup target add riscv32imac-unknown-none-elf`
 
 ### Environment configuration
 
