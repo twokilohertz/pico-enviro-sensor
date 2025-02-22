@@ -8,13 +8,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-embedded-hal = "1.0.0"
-fugit = "0.3.7"
-panic-halt = "1.0.0"
 rp235x-hal = { version = "0.2.0", features = [
     "critical-section-impl",
     "binary-info",
 ] }
+critical-section = "1.2.0"
+embedded-hal = "1.0.0"
+fugit = "0.3.7"
+scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conversion-fixes", features = [
+    "scd41",
+] }
+rtt-target = "0.6.1"
 
 # Super-optimised release build, maximum performance, minimal debuggability
 # Build with cargo build --profile dist

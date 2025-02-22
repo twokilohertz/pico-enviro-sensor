@@ -15,8 +15,6 @@ rustflags = [
     "link-arg=--nmagic",
     "-C",
     "link-arg=-Tlink.x",
-    # "-C",
-    # "link-arg=-Tdefmt.x",
     "-C",
     "target-cpu=cortex-m33",
 ]
@@ -24,13 +22,6 @@ rustflags = [
 runner = "picotool load -u -v -x -t elf"
 
 [target.riscv32imac-unknown-none-elf]
-rustflags = [
-    "-C",
-    "link-arg=--nmagic",
-    "-C",
-    "link-arg=-Trp235x_riscv.x",
-    # "-C",
-    # "link-arg=-Tdefmt.x",
-]
+rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Trp235x_riscv.x"]
 
 runner = "picotool load -u -v -x -t elf"

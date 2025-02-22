@@ -3,17 +3,13 @@
 
 use embedded_hal::delay::DelayNs;
 use fugit::RateExtU32;
-use panic_halt as _; // Needed so its built & linked correctly
-
-// Alias for our HAL crate
-use rp235x_hal as hal;
+use rtt_target::{rprintln, rtt_init_print};
 
 // RP235x HAL
-use hal::uart::DataBits;
-use hal::uart::StopBits;
-use hal::uart::UartConfig;
-use hal::uart::UartPeripheral;
-use hal::Clock;
+use rp235x_hal as hal;
+
+// Sensor
+use scd4x::Scd4x;
 
 mod constants;
 
@@ -23,6 +19,9 @@ pub static IMAGE_DEF: hal::block::ImageDef = hal::block::ImageDef::secure_exe();
 
 #[hal::entry]
 fn main() -> ! {
+    rtt_init_print!();
+    rprintln!("Logging over RTT initialised");
+
     let mut peripherals = hal::pac::Peripherals::take().unwrap();
 
     let mut watchdog = hal::Watchdog::new(peripherals.WATCHDOG);
@@ -49,18 +48,73 @@ fn main() -> ! {
         &mut peripherals.RESETS,
     );
 
-    let uart0_pins = (pins.gpio0.into_function(), pins.gpio1.into_function());
+    rprintln!("Core RP2350 hardware initialisation successful");
 
-    let uart = UartPeripheral::new(peripherals.UART0, uart0_pins, &mut peripherals.RESETS)
-        .enable(
-            UartConfig::new(9600_u32.Hz(), DataBits::Eight, None, StopBits::One),
-            clocks.peripheral_clock.freq(),
-        )
-        .unwrap();
+    // Initialise SCD41 sensor
+    let i2c0 = hal::I2C::i2c0(
+        peripherals.I2C0,
+        pins.gpio4.reconfigure(), // Pin 6 on Pico 2 (SDA)
+        pins.gpio5.reconfigure(), // Pin 7 on Pico 2 (SCL)
+        400.kHz(),
+        &mut peripherals.RESETS,
+        &clocks.peripheral_clock,
+    );
+
+    timer.delay_ms(30); // Power-up delay
+    let mut scd41 = Scd4x::new(i2c0, timer);
+    scd41.wake_up();
+
+    match scd41.reinit() {
+        Ok(_) => rprintln!("Initialised SCD41"),
+        Err(error) => rprintln!("Failed to initialise SCD41: {:?}", error),
+    }
+    timer.delay_ms(30); // Soft reset delay
+
+    match scd41.serial_number() {
+        Ok(serial) => rprintln!("SCD41 serial number: {}", serial),
+        Err(error) => rprintln!("SCD41 did not respond to get_serial_number: {:?}", error),
+    }
+
+    match scd41.self_test_is_ok() {
+        Ok(ok) => {
+            if ok {
+                rprintln!("SCD41 reported successful self-test")
+            } else {
+                rprintln!("SCD41 reported unsuccessful self-test!")
+            }
+        }
+        Err(_) => rprintln!("SCD41 failed to perform self-test"),
+    }
+
+    match scd41.start_periodic_measurement() {
+        Ok(_) => rprintln!("Configured sensor to measure every 5 seconds"),
+        Err(error) => rprintln!("SCD41 start_periodic_measurement() failed: {:?}", error),
+    }
 
     loop {
-        uart.write_full_blocking(b"hello, world!\r\n");
-        timer.delay_ms(500);
+        timer.delay_ms(5010);
+        match scd41.measurement() {
+            Ok(data) => rprintln!(
+                "CO2: {}, temperature: {}, humidity: {}",
+                data.co2,
+                data.temperature,
+                data.humidity
+            ),
+            Err(error) => rprintln!("SCD41 get_measurement() failed: {:?}", error),
+        }
+    }
+
+    // loop {
+    //     hal::arch::wfi();
+    // }
+}
+
+#[inline(never)]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    rprintln!("Panicked! {}", info);
+    loop {
+        hal::arch::nop()
     }
 }
 
