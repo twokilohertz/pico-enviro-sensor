@@ -1,15 +1,32 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::delay::DelayNs;
-use fugit::RateExtU32;
-use rtt_target::{rprintln, rtt_init_print};
-
 // RP235x HAL
 use rp235x_hal as hal;
 
+use hal::gpio::FunctionSpi;
+use hal::spi::Spi;
+
+// Display
+use ssd1351::{
+    mode::GraphicsMode,
+    prelude::SPIInterface,
+    properties::{DisplayRotation, DisplaySize},
+};
+
 // Sensor
-use scd4x::Scd4x;
+// use scd4x::Scd4x;
+
+use embedded_graphics::{
+    pixelcolor::Rgb565,
+    prelude::{Point, Primitive, RgbColor, Size},
+    primitives::{PrimitiveStyleBuilder, Rectangle},
+    Drawable,
+};
+
+use embedded_hal::spi::MODE_0;
+use fugit::RateExtU32;
+use rtt_target::{rprintln, rtt_init_print};
 
 mod constants;
 
@@ -50,63 +67,97 @@ fn main() -> ! {
 
     rprintln!("Core RP2350 hardware initialisation successful");
 
-    // Initialise SCD41 sensor
-    let i2c0 = hal::I2C::i2c0(
-        peripherals.I2C0,
-        pins.gpio4.reconfigure(), // Pin 6 on Pico 2 (SDA)
-        pins.gpio5.reconfigure(), // Pin 7 on Pico 2 (SCL)
-        400.kHz(),
+    // Display
+
+    let mosi_pin = pins.gpio19.into_function::<FunctionSpi>();
+    let sclk_pin = pins.gpio18.into_function::<FunctionSpi>();
+    let cs_pin = pins.gpio17.into_push_pull_output();
+    let dc_pin = pins.gpio20.into_push_pull_output();
+    let mut rst_pin = pins.gpio21.into_push_pull_output();
+
+    // SPI initialisation
+    let spi_pins = (mosi_pin, sclk_pin);
+    let spi = Spi::<_, _, _, 8>::new(peripherals.SPI0, spi_pins).init(
         &mut peripherals.RESETS,
         &clocks.peripheral_clock,
+        16_u32.MHz(),
+        MODE_0,
     );
+    let spi_device = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, cs_pin).unwrap();
+    let spi_interface = SPIInterface::new(spi_device, dc_pin);
 
-    timer.delay_ms(30); // Power-up delay
-    let mut scd41 = Scd4x::new(i2c0, timer);
-    scd41.wake_up();
+    let mut display: GraphicsMode<_> = ssd1351::builder::Builder::new()
+        .with_size(DisplaySize::Display128x128)
+        .with_rotation(DisplayRotation::Rotate0)
+        .connect_interface(spi_interface)
+        .into();
+    display.reset(&mut rst_pin, &mut timer).unwrap();
+    display.init().unwrap();
 
-    match scd41.reinit() {
-        Ok(_) => rprintln!("Initialised SCD41"),
-        Err(error) => rprintln!("Failed to initialise SCD41: {:?}", error),
-    }
-    timer.delay_ms(30); // Soft reset delay
+    let rect = Rectangle::new(Point::new(0, 40), Size::new(40, 20)).into_styled(
+        PrimitiveStyleBuilder::new()
+            .fill_color(Rgb565::CYAN)
+            .build(),
+    );
+    rect.draw(&mut display).unwrap();
 
-    match scd41.serial_number() {
-        Ok(serial) => rprintln!("SCD41 serial number: {}", serial),
-        Err(error) => rprintln!("SCD41 did not respond to get_serial_number: {:?}", error),
-    }
+    // // Initialise SCD41 sensor
+    // let i2c0 = hal::I2C::i2c0(
+    //     peripherals.I2C0,
+    //     pins.gpio4.reconfigure(), // Pin 6 on Pico 2 (SDA)
+    //     pins.gpio5.reconfigure(), // Pin 7 on Pico 2 (SCL)
+    //     400.kHz(),
+    //     &mut peripherals.RESETS,
+    //     &clocks.peripheral_clock,
+    // );
 
-    match scd41.self_test_is_ok() {
-        Ok(ok) => {
-            if ok {
-                rprintln!("SCD41 reported successful self-test")
-            } else {
-                rprintln!("SCD41 reported unsuccessful self-test!")
-            }
-        }
-        Err(_) => rprintln!("SCD41 failed to perform self-test"),
-    }
+    // timer.delay_ms(30); // Power-up delay
+    // let mut scd41 = Scd4x::new(i2c0, timer);
+    // scd41.wake_up();
 
-    match scd41.start_periodic_measurement() {
-        Ok(_) => rprintln!("Configured sensor to measure every 5 seconds"),
-        Err(error) => rprintln!("SCD41 start_periodic_measurement() failed: {:?}", error),
-    }
+    // match scd41.reinit() {
+    //     Ok(_) => rprintln!("Initialised SCD41"),
+    //     Err(error) => rprintln!("Failed to initialise SCD41: {:?}", error),
+    // }
+    // timer.delay_ms(30); // Soft reset delay
 
-    loop {
-        timer.delay_ms(5010);
-        match scd41.measurement() {
-            Ok(data) => rprintln!(
-                "CO2: {}, temperature: {}, humidity: {}",
-                data.co2,
-                data.temperature,
-                data.humidity
-            ),
-            Err(error) => rprintln!("SCD41 get_measurement() failed: {:?}", error),
-        }
-    }
+    // match scd41.serial_number() {
+    //     Ok(serial) => rprintln!("SCD41 serial number: {}", serial),
+    //     Err(error) => rprintln!("SCD41 did not respond to get_serial_number: {:?}", error),
+    // }
+
+    // match scd41.self_test_is_ok() {
+    //     Ok(ok) => {
+    //         if ok {
+    //             rprintln!("SCD41 reported successful self-test")
+    //         } else {
+    //             rprintln!("SCD41 reported unsuccessful self-test!")
+    //         }
+    //     }
+    //     Err(_) => rprintln!("SCD41 failed to perform self-test"),
+    // }
+
+    // match scd41.start_periodic_measurement() {
+    //     Ok(_) => rprintln!("Configured sensor to measure every 5 seconds"),
+    //     Err(error) => rprintln!("SCD41 start_periodic_measurement() failed: {:?}", error),
+    // }
 
     // loop {
-    //     hal::arch::wfi();
+    //     timer.delay_ms(5010);
+    //     match scd41.measurement() {
+    //         Ok(data) => rprintln!(
+    //             "CO2: {}, temperature: {}, humidity: {}",
+    //             data.co2,
+    //             data.temperature,
+    //             data.humidity
+    //         ),
+    //         Err(error) => rprintln!("SCD41 get_measurement() failed: {:?}", error),
+    //     }
     // }
+
+    loop {
+        hal::arch::wfi();
+    }
 }
 
 #[inline(never)]

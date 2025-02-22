@@ -19,6 +19,9 @@ scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conver
     "scd41",
 ] }
 rtt-target = "0.6.1"
+ssd1351 = "0.5.0"
+embedded-hal-bus = "0.3.0"
+embedded-graphics = "0.8.1"
 
 # Super-optimised release build, maximum performance, minimal debuggability
 # Build with cargo build --profile dist
