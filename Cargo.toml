@@ -8,20 +8,27 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rp235x-hal = { version = "0.2.0", features = [
-    "critical-section-impl",
+# Embassy
+embassy-rp = { version = "0.3.1", features = [
+    "rp235xa",
     "binary-info",
+    "critical-section-impl",
+    "time-driver",
 ] }
+embassy-executor = { version = "0.7.0", features = [
+    "arch-cortex-m",
+    "executor-thread",
+    "executor-interrupt",
+    "task-arena-size-65536",
+] }
+embassy-time = "0.4.0"
+
+cortex-m-rt = "0.7.5"
 critical-section = "1.2.0"
-embedded-hal = "1.0.0"
-fugit = "0.3.7"
-scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conversion-fixes", features = [
-    "scd41",
-] }
 rtt-target = "0.6.1"
-ssd1351 = "0.5.0"
-embedded-hal-bus = "0.3.0"
-embedded-graphics = "0.8.1"
+
+[profile.dev]
+opt-level = "s"
 
 # Super-optimised release build, maximum performance, minimal debuggability
 # Build with cargo build --profile dist
