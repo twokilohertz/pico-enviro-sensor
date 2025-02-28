@@ -24,7 +24,7 @@ async fn main(_spawner: Spawner) {
 
     let sda = peripherals.PIN_4;
     let scl = peripherals.PIN_5;
-    let i2c_config = embassy_rp::i2c::Config::default();
+    let i2c_config = embassy_rp::i2c::Config::default(); // TODO: Frequency is 100 MHz by default, should be 400 MHz
     let i2c_bus = embassy_rp::i2c::I2c::new_blocking(peripherals.I2C0, scl, sda, i2c_config);
 
     embassy_time::Timer::after_millis(30).await; // SCD41 power-up delay
