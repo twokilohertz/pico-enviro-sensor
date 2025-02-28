@@ -805,6 +805,7 @@ dependencies = [
  "embassy-rp",
  "embassy-time",
  "rtt-target",
+ "scd4x",
 ]
 
 [[package]]
@@ -1035,6 +1036,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 
 [[package]]
+name = "scd4x"
+version = "0.4.0"
+source = "git+https://github.com/twokilohertz/scd4x-rs.git?branch=main#b9b0cb774b78ec7317c3e66f2fae745711101abb"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "log",
+ "sensirion-i2c",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1054,6 +1065,15 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "sensirion-i2c"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "640a03c95c176226cf159ae2727f7fe3245546022639d61459af46d2878aec06"
+dependencies = [
+ "embedded-hal 1.0.0",
+]
 
 [[package]]
 name = "sha2-const-stable"

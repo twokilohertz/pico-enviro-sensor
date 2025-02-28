@@ -23,9 +23,15 @@ embassy-executor = { version = "0.7.0", features = [
 ] }
 embassy-time = "0.4.0"
 
+# System
 cortex-m-rt = "0.7.5"
 critical-section = "1.2.0"
 rtt-target = "0.6.1"
+
+# Peripherals
+scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "main", features = [
+    "scd41",
+] }
 
 [profile.dev]
 opt-level = "s"
