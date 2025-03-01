@@ -13,9 +13,13 @@ use ssd1351::{
 
 // Graphics
 use embedded_graphics::{
+    mono_font::{
+        ascii::{FONT_5X7, FONT_6X10},
+        MonoTextStyle,
+    },
     pixelcolor::Rgb565,
-    prelude::{Point, Primitive, WebColors},
-    primitives::{Circle, PrimitiveStyle},
+    prelude::{Dimensions, Point, RgbColor},
+    text::{Alignment, Text},
     Drawable,
 };
 
@@ -44,8 +48,26 @@ pub async fn display_output_task(
     display.reset(rst, &mut embassy_time::Delay).unwrap();
     display.init().unwrap();
 
-    Circle::new(Point::new(0, 0), 128)
-        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_CHARTREUSE))
-        .draw(&mut display)
-        .unwrap();
+    let text_style1 = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
+    let text_style2 = MonoTextStyle::new(&FONT_5X7, Rgb565::WHITE);
+    let text1 = "Hello, World!";
+    let text2 = "2khz.xyz";
+
+    Text::with_alignment(
+        text1,
+        display.bounding_box().center() + Point::new(0, -6),
+        text_style1,
+        Alignment::Center,
+    )
+    .draw(&mut display)
+    .unwrap();
+
+    Text::with_alignment(
+        text2,
+        display.bounding_box().center() + Point::new(0, 6),
+        text_style2,
+        Alignment::Center,
+    )
+    .draw(&mut display)
+    .unwrap();
 }
