@@ -6,7 +6,7 @@ use rtt_target::rprintln;
 // Sensor
 use scd4x::Scd4x;
 
-use crate::I2c0BusMutex;
+use crate::{I2c0BusMutex, SENSOR_DATA_SIGNAL};
 
 /// Read CO2/temp./humidity data from the sensor
 #[embassy_executor::task]
@@ -41,6 +41,8 @@ pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
                     data.temperature,
                     data.humidity
                 );
+
+                SENSOR_DATA_SIGNAL.signal(data);
             }
             Err(error) => {
                 rprintln!(

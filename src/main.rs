@@ -16,19 +16,28 @@ use embassy_rp::{
     peripherals::{I2C0, SPI0},
     spi,
 };
-use embassy_sync::blocking_mutex::{raw::NoopRawMutex, Mutex};
+use embassy_sync::{
+    blocking_mutex::{
+        raw::{CriticalSectionRawMutex, NoopRawMutex},
+        Mutex,
+    },
+    signal::Signal,
+};
 use embassy_time::Timer;
 use static_cell::StaticCell;
 
 use display_task::display_output_task;
 use sensor_task::sensor_read_task;
 
+type I2c0BusMutex = Mutex<NoopRawMutex, RefCell<i2c::I2c<'static, I2C0, i2c::Blocking>>>;
+type Spi0BusMutex = Mutex<NoopRawMutex, RefCell<spi::Spi<'static, SPI0, spi::Blocking>>>;
+
 embassy_rp::bind_interrupts!(struct Irqs {
     I2C0_IRQ => embassy_rp::i2c::InterruptHandler<embassy_rp::peripherals::I2C0>;
 });
 
-type I2c0BusMutex = Mutex<NoopRawMutex, RefCell<i2c::I2c<'static, I2C0, i2c::Blocking>>>;
-type Spi0BusMutex = Mutex<NoopRawMutex, RefCell<spi::Spi<'static, SPI0, spi::Blocking>>>;
+static SENSOR_DATA_SIGNAL: Signal<CriticalSectionRawMutex, scd4x::types::SensorData> =
+    Signal::new();
 
 /// Entrypoint
 #[embassy_executor::main]

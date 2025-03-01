@@ -13,17 +13,15 @@ use ssd1351::{
 
 // Graphics
 use embedded_graphics::{
-    mono_font::{
-        ascii::{FONT_5X7, FONT_6X10},
-        MonoTextStyle,
-    },
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::Rgb565,
-    prelude::{Dimensions, Point, RgbColor},
+    prelude::{Point, WebColors},
     text::{Alignment, Text},
     Drawable,
 };
 
-use crate::Spi0BusMutex;
+use crate::{Spi0BusMutex, SENSOR_DATA_SIGNAL};
+use core::fmt::Write;
 
 /// Output to the SSD1351 display
 #[embassy_executor::task]
@@ -48,26 +46,55 @@ pub async fn display_output_task(
     display.reset(rst, &mut embassy_time::Delay).unwrap();
     display.init().unwrap();
 
-    let text_style1 = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-    let text_style2 = MonoTextStyle::new(&FONT_5X7, Rgb565::WHITE);
-    let text1 = "Hello, World!";
-    let text2 = "2khz.xyz";
+    let co2_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_DARK_GREEN);
+    let temp_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_ORANGE);
+    let humidity_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_AQUA);
 
-    Text::with_alignment(
-        text1,
-        display.bounding_box().center() + Point::new(0, -6),
-        text_style1,
-        Alignment::Center,
-    )
-    .draw(&mut display)
-    .unwrap();
+    let mut co2_text_buf = heapless::String::<16>::new();
+    let mut temp_text_buf = heapless::String::<16>::new();
+    let mut humidity_text_buf = heapless::String::<16>::new();
 
-    Text::with_alignment(
-        text2,
-        display.bounding_box().center() + Point::new(0, 6),
-        text_style2,
-        Alignment::Center,
-    )
-    .draw(&mut display)
-    .unwrap();
+    loop {
+        // Clear contents of buffers
+        co2_text_buf.clear();
+        temp_text_buf.clear();
+        humidity_text_buf.clear();
+
+        // Wait on sensor data & format into the buffers
+        let data = SENSOR_DATA_SIGNAL.wait().await;
+        write!(&mut co2_text_buf, "CO2: {} ppm", data.co2).unwrap();
+        write!(&mut temp_text_buf, "Temp: {:.1} C", data.temperature).unwrap();
+        write!(&mut humidity_text_buf, "RH: {:.1} %", data.humidity).unwrap();
+
+        // Clear the display
+        display.clear();
+
+        // Draw the text to the screen
+        Text::with_alignment(
+            &co2_text_buf,
+            Point::new(1, 12),
+            co2_text_style,
+            Alignment::Left,
+        )
+        .draw(&mut display)
+        .unwrap();
+
+        Text::with_alignment(
+            &temp_text_buf,
+            Point::new(1, 24),
+            temp_text_style,
+            Alignment::Left,
+        )
+        .draw(&mut display)
+        .unwrap();
+
+        Text::with_alignment(
+            &humidity_text_buf,
+            Point::new(1, 36),
+            humidity_text_style,
+            Alignment::Left,
+        )
+        .draw(&mut display)
+        .unwrap();
+    }
 }

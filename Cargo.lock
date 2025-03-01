@@ -869,6 +869,7 @@ dependencies = [
  "embassy-sync",
  "embassy-time",
  "embedded-graphics",
+ "heapless",
  "rtt-target",
  "scd4x",
  "ssd1351",
