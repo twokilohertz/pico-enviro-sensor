@@ -1,20 +1,29 @@
 #![no_std]
 #![no_main]
 
+mod sensor_task;
+
+use core::cell::RefCell;
+
 use rtt_target::{rprintln, rtt_init_print};
 
 use embassy_executor::Spawner;
-use embassy_rp::block::ImageDef;
+use embassy_rp::{block::ImageDef, i2c::Blocking, i2c::I2c, peripherals::I2C0};
+use embassy_sync::blocking_mutex::{raw::NoopRawMutex, Mutex};
+use embassy_time::Timer;
+use static_cell::StaticCell;
 
-mod sensor_task;
+use sensor_task::sensor_read_task;
 
 embassy_rp::bind_interrupts!(struct Irqs {
     I2C0_IRQ => embassy_rp::i2c::InterruptHandler<embassy_rp::peripherals::I2C0>;
 });
 
+type I2c0BusType = Mutex<NoopRawMutex, RefCell<I2c<'static, I2C0, Blocking>>>;
+
 /// Entrypoint
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     // Initialise RTT logging
 
     rtt_init_print!();
@@ -22,52 +31,19 @@ async fn main(_spawner: Spawner) {
 
     let peripherals = embassy_rp::init(Default::default());
 
+    // Initialise I2C0 on pins 4 & 5 for the SCD41 sensor
     let sda = peripherals.PIN_4;
     let scl = peripherals.PIN_5;
-    let mut i2c_config = embassy_rp::i2c::Config::default(); // TODO: Frequency is 100 MHz by default, should be 400 MHz
-    i2c_config.frequency = 400_000u32;
+    let mut i2c_config = embassy_rp::i2c::Config::default();
+    i2c_config.frequency = 400_000u32; // 400 kHz
     let i2c_bus = embassy_rp::i2c::I2c::new_blocking(peripherals.I2C0, scl, sda, i2c_config);
+    static I2C0_BUS: StaticCell<I2c0BusType> = StaticCell::new();
+    let shared_i2c0_bus = I2C0_BUS.init(Mutex::new(RefCell::new(i2c_bus)));
 
-    embassy_time::Timer::after_millis(30).await; // SCD41 power-up delay
-    let mut scd41 = scd4x::Scd4x::new(i2c_bus, embassy_time::Delay);
-    scd41.wake_up();
-    scd41.reinit().unwrap();
-
-    match scd41.serial_number() {
-        Ok(serial) => rprintln!("[SCD41] Serial number: {}", serial),
-        Err(error) => rprintln!(
-            "[SCD41] Error: did not respond to get_serial_number: {:?}",
-            error
-        ),
-    }
-
-    scd41.start_periodic_measurement().unwrap();
+    spawner.must_spawn(sensor_read_task(shared_i2c0_bus));
 
     loop {
-        embassy_time::Timer::after_secs(5).await;
-        match scd41.measurement() {
-            Ok(data) => {
-                rprintln!(
-                    "[SCD41] CO2: {} ppm, temperature: {} C, humidity: {} RH",
-                    data.co2,
-                    data.temperature,
-                    data.humidity
-                );
-            }
-            Err(error) => {
-                rprintln!(
-                    "[SCD41] Error: failed to retrieve measurement data: {:?}",
-                    error
-                );
-                break;
-            }
-        }
-    }
-
-    loop {
-        unsafe {
-            core::arch::asm!("wfi");
-        }
+        Timer::after_secs(1).await;
     }
 }
 
