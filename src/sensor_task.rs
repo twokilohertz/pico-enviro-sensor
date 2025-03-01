@@ -6,10 +6,11 @@ use rtt_target::rprintln;
 // Sensor
 use scd4x::Scd4x;
 
-use crate::I2c0BusType;
+use crate::I2c0BusMutex;
 
+/// Read CO2/temp./humidity data from the sensor
 #[embassy_executor::task]
-pub async fn sensor_read_task(i2c_bus: &'static I2c0BusType) {
+pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
     rprintln!("Sensor read task started");
 
     Timer::after_millis(30).await; // SCD41 power-up delay
@@ -30,7 +31,7 @@ pub async fn sensor_read_task(i2c_bus: &'static I2c0BusType) {
     scd41.start_periodic_measurement().unwrap();
 
     loop {
-        Timer::after_secs(5).await; // start_periodic_measurement() returns new sensor data every 5 seconds
+        Timer::after_secs(5).await; // start_periodic_measurement returns new sensor data every 5 seconds
 
         match scd41.measurement() {
             Ok(data) => {

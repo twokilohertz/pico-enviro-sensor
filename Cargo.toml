@@ -25,6 +25,7 @@ embassy-time = "0.4.0"
 embassy-sync = "0.6.2"
 embassy-embedded-hal = "0.3.0"
 static_cell = "2.1.0"
+embedded-graphics = "0.8.1"
 
 # System
 cortex-m-rt = "0.7.5"
@@ -34,6 +35,8 @@ rtt-target = "0.6.1"
 scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conversion-fixes", features = [
     "scd41",
 ] }
+ssd1351 = "0.5.0"
+display-interface-spi = "0.5.0"
 
 [profile.dev]
 opt-level = "s"
