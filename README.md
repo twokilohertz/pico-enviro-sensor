@@ -1,6 +1,6 @@
 # Pico Environment Sensor
 
-This firmware, written in Rust using embedded-hal ([rp235x-hal](https://crates.io/crates/rp235x-hal)), is designed for the [Raspberry Pi Pico 2 W](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico2w-technical-specification) platform using the RP2350 microcontroller. Its application is an environment-sensing device which can measure CO2 concentration in the atmosphere, ambient temperature and humidity. 
+This firmware, written in Rust using [embassy-rs](https://github.com/embassy-rs/embassy), is designed for the [Raspberry Pi Pico 2 W](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico2w-technical-specification) platform using the RP2350 microcontroller. Its application is an environment-sensing device which can measure CO2 concentration in the atmosphere, ambient temperature and humidity. 
 
 ## Building
 
