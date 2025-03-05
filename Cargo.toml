@@ -25,11 +25,14 @@ embassy-time = "0.4.0"
 embassy-sync = "0.6.2"
 embassy-embedded-hal = "0.3.0"
 static_cell = "2.1.0"
-embedded-graphics = "0.8.1"
 
 # System
 cortex-m-rt = "0.7.5"
 rtt-target = "0.6.1"
+
+# embedded-graphics
+embedded-graphics = "0.8.1"
+embedded-graphics-framebuf = "0.5.0"
 
 # Peripherals
 scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conversion-fixes", features = [
