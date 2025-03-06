@@ -907,6 +907,7 @@ dependencies = [
  "embedded-graphics-framebuf",
  "heapless",
  "itertools 0.14.0",
+ "num-traits",
  "rtt-target",
  "scd4x",
  "ssd1351",

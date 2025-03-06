@@ -18,8 +18,8 @@ use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::Rgb565,
     prelude::{Point, Primitive, RgbColor, Size, WebColors},
-    primitives::{Line, PrimitiveStyle, Rectangle},
-    text::{Alignment, Text},
+    primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
+    text::{Alignment, Text, TextStyleBuilder},
     Drawable,
 };
 
@@ -28,11 +28,10 @@ use circular_buffer::CircularBuffer;
 use heapless::String;
 use itertools::Itertools;
 
+use core::fmt::Write;
+use num_traits::{Num, NumCast};
+
 use crate::{Spi0BusMutex, SENSOR_DATA_SIGNAL};
-use core::{
-    fmt::Write,
-    ops::{Add, Div, Sub},
-};
 
 const DISPLAY_WIDTH: usize = 128;
 const DISPLAY_HEIGHT: usize = 128;
@@ -65,9 +64,13 @@ pub async fn display_output_task(
     let mut framebuf = FrameBuf::new(buf, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
     // Text styles
-    let co2_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_DARK_GREEN);
-    let temp_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_ORANGE);
-    let humidity_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_AQUA);
+    let align_l_base_bottom = TextStyleBuilder::new()
+        .alignment(Alignment::Left)
+        .baseline(embedded_graphics::text::Baseline::Bottom)
+        .build();
+    let co2_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_FOREST_GREEN);
+    let temp_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_ORANGE_RED);
+    let humidity_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_AQUAMARINE);
 
     // Format string buffers
     let mut co2_text_buf = String::<16>::new();
@@ -101,19 +104,19 @@ pub async fn display_output_task(
 
         let co2_min = *co2_samples.iter().min().unwrap();
         let co2_max = *co2_samples.iter().max().unwrap();
-        let _temp_min = *temp_samples
+        let temp_min = *temp_samples
             .iter()
             .reduce(|a: &f32, b: &f32| if a.le(b) { a } else { b })
             .unwrap();
-        let _temp_max = *temp_samples
+        let temp_max = *temp_samples
             .iter()
             .reduce(|a: &f32, b: &f32| if a.ge(b) { a } else { b })
             .unwrap();
-        let _humid_min = *humidity_samples
+        let humid_min = *humidity_samples
             .iter()
             .reduce(|a: &f32, b: &f32| if a.le(b) { a } else { b })
             .unwrap();
-        let _humid_max = *humidity_samples
+        let humid_max = *humidity_samples
             .iter()
             .reduce(|a: &f32, b: &f32| if a.ge(b) { a } else { b })
             .unwrap();
@@ -128,62 +131,137 @@ pub async fn display_output_task(
         // Draw line graphs
 
         if co2_samples.len() >= 2 {
-            // CO2 line graph happens 4 pixels from the top, with 4 pixels either side
+            draw_line_graph(
+                &co2_samples,
+                co2_max.into(),
+                co2_min.into(),
+                4,
+                Rgb565::CSS_DARK_GREEN,
+                Some(Rgb565::new(3, 5, 3)),
+                &mut framebuf,
+            )
+            .unwrap();
+        }
 
-            let mut x_pos: i32 = (DISPLAY_WIDTH - 4) as i32;
+        if temp_samples.len() >= 2 {
+            draw_line_graph(
+                &temp_samples,
+                temp_max as i32,
+                temp_min as i32,
+                38,
+                Rgb565::CSS_ORANGE,
+                Some(Rgb565::new(3, 5, 3)),
+                &mut framebuf,
+            )
+            .unwrap();
+        }
 
-            for (a, b) in co2_samples.iter().rev().tuple_windows::<(_, _)>() {
-                let co2_range = if (co2_max - co2_min) == 0 {
-                    1
-                } else {
-                    co2_max - co2_min
-                };
-
-                let a_y_pos: i32 = (4 + (((co2_max - a) * 30) / co2_range)) as i32;
-                let b_y_pos: i32 = (4 + (((co2_max - b) * 30) / co2_range)) as i32;
-
-                Line::new(Point::new(x_pos, a_y_pos), Point::new(x_pos - 2, b_y_pos))
-                    .into_styled(PrimitiveStyle::with_stroke(Rgb565::CSS_DARK_GREEN, 1))
-                    .draw(&mut framebuf)
-                    .unwrap();
-
-                x_pos -= 2;
-            }
+        if humidity_samples.len() >= 2 {
+            draw_line_graph(
+                &humidity_samples,
+                humid_max as i32,
+                humid_min as i32,
+                72,
+                Rgb565::CSS_AQUA,
+                Some(Rgb565::new(3, 5, 3)),
+                &mut framebuf,
+            )
+            .unwrap();
         }
 
         // Draw the text to the screen
-        Text::with_alignment(
+
+        Text::with_text_style(
             &co2_text_buf,
-            Point::new(1, 12),
+            Point::new(5, 34),
             co2_text_style,
-            Alignment::Left,
+            align_l_base_bottom,
         )
         .draw(&mut framebuf)
         .unwrap();
 
-        Text::with_alignment(
+        Text::with_text_style(
             &temp_text_buf,
-            Point::new(1, 24),
+            Point::new(5, 68),
             temp_text_style,
-            Alignment::Left,
+            align_l_base_bottom,
         )
         .draw(&mut framebuf)
         .unwrap();
 
-        Text::with_alignment(
+        Text::with_text_style(
             &humidity_text_buf,
-            Point::new(1, 36),
+            Point::new(5, 102),
             humidity_text_style,
-            Alignment::Left,
+            align_l_base_bottom,
         )
         .draw(&mut framebuf)
         .unwrap();
 
         // Draw the entire framebuffer to the display
+
         let area: Rectangle = Rectangle::new(
             Point::new(0, 0),
             Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
         );
         display.fill_contiguous(&area, framebuf.data).unwrap();
+    }
+
+    fn draw_line_graph<'a, I, V, D, C>(
+        collection: I,
+        graph_max: i32,
+        graph_min: i32,
+        y_start: i32,
+        line_colour: C,
+        back_colour: Option<C>,
+        target: &mut D,
+    ) -> Result<(), D::Error>
+    where
+        I: IntoIterator<Item = &'a V>,
+        I::IntoIter: DoubleEndedIterator,
+        V: ?Sized + 'a + Num + NumCast + Clone,
+        C: RgbColor,
+        D: DrawTarget<Color = C>,
+    {
+        let mut x_pos: i32 = (DISPLAY_WIDTH - 5) as i32;
+
+        match back_colour {
+            Some(c) => {
+                let style = PrimitiveStyleBuilder::new().fill_color(c).build();
+
+                Rectangle::new(Point::new(4, y_start), Size::new(120, 30))
+                    .into_styled(style)
+                    .draw(target)?;
+            }
+            None => {}
+        }
+
+        for (a, b) in collection.into_iter().rev().tuple_windows::<(_, _)>() {
+            let range: i32 = if (graph_max - graph_min) == 0 {
+                1_i32
+            } else {
+                graph_max - graph_min
+            };
+
+            let a_i32: i32 = match NumCast::from(a.clone()) {
+                Some(v) => v,
+                None => 0,
+            };
+            let b_i32: i32 = match NumCast::from(b.clone()) {
+                Some(v) => v,
+                None => 0,
+            };
+
+            let a_y_pos: i32 = y_start + (((graph_max - a_i32) * 30) / range);
+            let b_y_pos: i32 = y_start + (((graph_max - b_i32) * 30) / range);
+
+            Line::new(Point::new(x_pos, a_y_pos), Point::new(x_pos - 2, b_y_pos))
+                .into_styled(PrimitiveStyle::with_stroke(line_colour, 1))
+                .draw(target)?;
+
+            x_pos -= 2;
+        }
+
+        return Ok(());
     }
 }
