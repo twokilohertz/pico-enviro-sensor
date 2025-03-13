@@ -2,6 +2,8 @@
 
 This firmware, written in Rust using [embassy-rs](https://github.com/embassy-rs/embassy), is designed for the [Raspberry Pi Pico 2 W](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico2w-technical-specification) platform using the RP2350 microcontroller. Its application is an environment-sensing device which can measure CO2 concentration in the atmosphere, ambient temperature and humidity. 
 
+The effects of increased CO2 concentration on cognitive function become increasingly pronounced at CO2 concentrations exceeding 1000 ppm. There's a fantastic [YouTube video](https://www.youtube.com/watch?v=1Nh_vxpycEA) by Kurtis Baute and Tom Scott which you can watch for a short summary. Open your window right now!
+
 ## Building
 
 ### Prerequisites
