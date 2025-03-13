@@ -35,9 +35,7 @@ embedded-graphics = "0.8.1"
 embedded-graphics-framebuf = "0.5.0"
 
 # Peripherals
-scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "conversion-fixes", features = [
-    "scd41",
-] }
+scd4x = { version = "0.4.0", features = ["scd41"] }
 ssd1351 = "0.5.0"
 display-interface-spi = "0.5.0"
 
