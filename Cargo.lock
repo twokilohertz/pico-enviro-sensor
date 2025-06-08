@@ -704,15 +704,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "lalrpop"
 version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -723,7 +714,7 @@ dependencies = [
  "diff",
  "ena",
  "is-terminal",
- "itertools 0.10.5",
+ "itertools",
  "lalrpop-util",
  "petgraph",
  "regex",
@@ -896,18 +887,20 @@ name = "pico-enviro-sensor"
 version = "0.1.0"
 dependencies = [
  "circular-buffer",
+ "cortex-m",
  "cortex-m-rt",
+ "critical-section",
  "display-interface-spi",
  "embassy-embedded-hal",
  "embassy-executor",
+ "embassy-futures",
  "embassy-rp",
  "embassy-sync",
  "embassy-time",
  "embedded-graphics",
  "embedded-graphics-framebuf",
+ "fixed",
  "heapless",
- "itertools 0.14.0",
- "num-traits",
  "rtt-target",
  "scd4x",
  "ssd1351",
@@ -1144,7 +1137,8 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 [[package]]
 name = "scd4x"
 version = "0.4.0"
-source = "git+https://github.com/twokilohertz/scd4x-rs.git?branch=conversion-fixes#07730523c51d6909530c000de271832125760385"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550fedc97e7880654aa7dc840f5eb3b2201a01aae566c4584a3601bb0086cd4c"
 dependencies = [
  "embedded-hal 1.0.0",
  "log",

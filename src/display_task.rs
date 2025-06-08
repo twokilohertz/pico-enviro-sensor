@@ -1,8 +1,11 @@
+use core::fmt::Write;
+
 // System
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDeviceWithConfig;
 use embassy_rp::{gpio::Output, spi::Config};
 use embedded_graphics_framebuf::FrameBuf;
-use rtt_target::rprintln;
+use fixed::types::U16F16;
+use rtt_target::debug_rprintln;
 
 // Display
 use display_interface_spi::SPIInterface;
@@ -16,9 +19,9 @@ use ssd1351::{
 use embedded_graphics::{
     draw_target::DrawTarget,
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::Rgb565,
+    pixelcolor::{Rgb565, Rgb888},
     prelude::{Point, Primitive, RgbColor, Size, WebColors},
-    primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
+    primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
     text::{Alignment, Text, TextStyleBuilder},
     Drawable,
 };
@@ -26,15 +29,13 @@ use embedded_graphics::{
 // Containers
 use circular_buffer::CircularBuffer;
 use heapless::String;
-use itertools::Itertools;
-
-use core::fmt::Write;
-use num_traits::{Num, NumCast};
 
 use crate::{Spi0BusMutex, SENSOR_DATA_SIGNAL};
 
 const DISPLAY_WIDTH: usize = 128;
 const DISPLAY_HEIGHT: usize = 128;
+const DISPLAY_PADDING: usize = 5;
+type SensorDataBuffer = CircularBuffer<60, U16F16>;
 
 /// Output to the SSD1351 display
 #[embassy_executor::task]
@@ -45,7 +46,7 @@ pub async fn display_output_task(
     rst: &'static mut Output<'static>,
     spi_config: Config,
 ) {
-    rprintln!("Display output task started");
+    debug_rprintln!("Display output task started");
 
     let spi_dev = SpiDeviceWithConfig::new(spi_bus, cs, spi_config);
     let interface = SPIInterface::new(spi_dev, dc);
@@ -73,14 +74,14 @@ pub async fn display_output_task(
     let humidity_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_AQUAMARINE);
 
     // Format string buffers
-    let mut co2_text_buf = String::<16>::new();
-    let mut temp_text_buf = String::<16>::new();
-    let mut humidity_text_buf = String::<16>::new();
+    let mut co2_text_buf = String::<20>::new();
+    let mut temp_text_buf = String::<20>::new();
+    let mut humidity_text_buf = String::<20>::new();
 
     // Ring buffer for storing past measurement data
-    let mut co2_samples = CircularBuffer::<60, u16>::new();
-    let mut temp_samples = CircularBuffer::<60, f32>::new();
-    let mut humidity_samples = CircularBuffer::<60, f32>::new();
+    let mut co2_samples = SensorDataBuffer::new();
+    let mut temp_samples = SensorDataBuffer::new();
+    let mut humidity_samples = SensorDataBuffer::new();
 
     loop {
         // Clear the framebuffer
@@ -98,28 +99,19 @@ pub async fn display_output_task(
         write!(&mut humidity_text_buf, "RH: {:.1} %", sensor_data.humidity).unwrap();
 
         // Record samples
-        co2_samples.push_back(sensor_data.co2);
-        temp_samples.push_back(sensor_data.temperature);
-        humidity_samples.push_back(sensor_data.humidity);
+        co2_samples.push_back(U16F16::from_num(sensor_data.co2));
+        temp_samples.push_back(U16F16::from_num(sensor_data.temperature));
+        humidity_samples.push_back(U16F16::from_num(sensor_data.humidity));
+        co2_samples.make_contiguous();
+        temp_samples.make_contiguous();
+        humidity_samples.make_contiguous();
 
         let co2_min = *co2_samples.iter().min().unwrap();
         let co2_max = *co2_samples.iter().max().unwrap();
-        let temp_min = *temp_samples
-            .iter()
-            .reduce(|a: &f32, b: &f32| if a.le(b) { a } else { b })
-            .unwrap();
-        let temp_max = *temp_samples
-            .iter()
-            .reduce(|a: &f32, b: &f32| if a.ge(b) { a } else { b })
-            .unwrap();
-        let humid_min = *humidity_samples
-            .iter()
-            .reduce(|a: &f32, b: &f32| if a.le(b) { a } else { b })
-            .unwrap();
-        let humid_max = *humidity_samples
-            .iter()
-            .reduce(|a: &f32, b: &f32| if a.ge(b) { a } else { b })
-            .unwrap();
+        let temp_min = *temp_samples.iter().min().unwrap();
+        let temp_max = *temp_samples.iter().max().unwrap();
+        let humid_min = *humidity_samples.iter().min().unwrap();
+        let humid_max = *humidity_samples.iter().max().unwrap();
 
         /*
            Note about drawing positions:
@@ -130,44 +122,53 @@ pub async fn display_output_task(
 
         // Draw line graphs
 
-        if co2_samples.len() >= 2 {
-            draw_line_graph(
-                &co2_samples,
-                co2_max.into(),
-                co2_min.into(),
-                4,
-                Rgb565::CSS_DARK_GREEN,
-                Some(Rgb565::new(3, 5, 3)),
-                &mut framebuf,
-            )
-            .unwrap();
-        }
+        const LINE_GRAPH_WIDTH: u32 = (DISPLAY_WIDTH - (DISPLAY_PADDING * 2)) as u32;
+        const LINE_GRAPH_HEIGHT: u32 = 36;
 
-        if temp_samples.len() >= 2 {
-            draw_line_graph(
-                &temp_samples,
-                temp_max as i32,
-                temp_min as i32,
-                38,
-                Rgb565::CSS_ORANGE,
-                Some(Rgb565::new(3, 5, 3)),
-                &mut framebuf,
-            )
-            .unwrap();
-        }
+        draw_line_graph(
+            Rectangle::new(
+                Point::new(DISPLAY_PADDING as i32, DISPLAY_PADDING as i32),
+                Size::new(LINE_GRAPH_WIDTH, LINE_GRAPH_HEIGHT),
+            ),
+            co2_min,
+            co2_max,
+            co2_samples.as_slices().0,
+            Rgb565::CSS_DARK_GREEN,
+            Some(Rgb888::new(24, 24, 24).into()),
+            &mut framebuf,
+        );
 
-        if humidity_samples.len() >= 2 {
-            draw_line_graph(
-                &humidity_samples,
-                humid_max as i32,
-                humid_min as i32,
-                72,
-                Rgb565::CSS_AQUA,
-                Some(Rgb565::new(3, 5, 3)),
-                &mut framebuf,
-            )
-            .unwrap();
-        }
+        draw_line_graph(
+            Rectangle::new(
+                Point::new(
+                    DISPLAY_PADDING as i32,
+                    (LINE_GRAPH_HEIGHT + (DISPLAY_PADDING as u32 * 2)) as i32,
+                ),
+                Size::new(LINE_GRAPH_WIDTH, LINE_GRAPH_HEIGHT),
+            ),
+            temp_min,
+            temp_max,
+            temp_samples.as_slices().0,
+            Rgb565::CSS_ORANGE,
+            Some(Rgb888::new(24, 24, 24).into()),
+            &mut framebuf,
+        );
+
+        draw_line_graph(
+            Rectangle::new(
+                Point::new(
+                    DISPLAY_PADDING as i32,
+                    ((LINE_GRAPH_HEIGHT * 2) + (DISPLAY_PADDING as u32 * 3)) as i32,
+                ),
+                Size::new(LINE_GRAPH_WIDTH, LINE_GRAPH_HEIGHT),
+            ),
+            humid_min,
+            humid_max,
+            humidity_samples.as_slices().0,
+            Rgb565::CSS_AQUA,
+            Some(Rgb888::new(24, 24, 24).into()),
+            &mut framebuf,
+        );
 
         // Draw the text to the screen
 
@@ -206,62 +207,61 @@ pub async fn display_output_task(
         );
         display.fill_contiguous(&area, framebuf.data).unwrap();
     }
+}
 
-    fn draw_line_graph<'a, I, V, D, C>(
-        collection: I,
-        graph_max: i32,
-        graph_min: i32,
-        y_start: i32,
-        line_colour: C,
-        back_colour: Option<C>,
-        target: &mut D,
-    ) -> Result<(), D::Error>
-    where
-        I: IntoIterator<Item = &'a V>,
-        I::IntoIter: DoubleEndedIterator,
-        V: ?Sized + 'a + Num + NumCast + Clone,
-        C: RgbColor,
-        D: DrawTarget<Color = C>,
-    {
-        let mut x_pos: i32 = (DISPLAY_WIDTH - 5) as i32;
+fn draw_line_graph<C, D>(
+    bounds: Rectangle,
+    y_min: U16F16,
+    y_max: U16F16,
+    samples: &[U16F16],
+    fg_colour: C,
+    bg_colour: Option<C>,
+    target: &mut D,
+) where
+    C: RgbColor,
+    D: DrawTarget<Color = C>,
+{
+    // Draw background colour first, if supplied
 
-        match back_colour {
-            Some(c) => {
-                let style = PrimitiveStyleBuilder::new().fill_color(c).build();
-
-                Rectangle::new(Point::new(4, y_start), Size::new(120, 30))
-                    .into_styled(style)
-                    .draw(target)?;
-            }
-            None => {}
-        }
-
-        for (a, b) in collection.into_iter().rev().tuple_windows::<(_, _)>() {
-            let range: i32 = if (graph_max - graph_min) == 0 {
-                1_i32
-            } else {
-                graph_max - graph_min
-            };
-
-            let a_i32: i32 = match NumCast::from(a.clone()) {
-                Some(v) => v,
-                None => 0,
-            };
-            let b_i32: i32 = match NumCast::from(b.clone()) {
-                Some(v) => v,
-                None => 0,
-            };
-
-            let a_y_pos: i32 = y_start + (((graph_max - a_i32) * 30) / range);
-            let b_y_pos: i32 = y_start + (((graph_max - b_i32) * 30) / range);
-
-            Line::new(Point::new(x_pos, a_y_pos), Point::new(x_pos - 2, b_y_pos))
-                .into_styled(PrimitiveStyle::with_stroke(line_colour, 1))
-                .draw(target)?;
-
-            x_pos -= 2;
-        }
-
-        return Ok(());
+    if let Some(bg_col) = bg_colour {
+        let _ = bounds.draw_styled(&PrimitiveStyle::with_fill(bg_col), target);
     }
+
+    // Draw the data points
+
+    if samples.len() < 2 {
+        // Drawing a line requires a minimum of two points
+        return;
+    }
+
+    let graph_width = U16F16::from_num(bounds.size.width);
+    let graph_height = U16F16::from_num(bounds.size.height);
+    let y_range = y_max - y_min;
+    let mut x_offset: i32 = bounds.top_left.x;
+    let n_samples: U16F16 = U16F16::from_num(samples.len());
+    let mut n_samples_seen: U16F16 = U16F16::from_num(1);
+
+    for sample in samples.windows(2) {
+        let x_pos_start: i32 = x_offset;
+        let y_pos_start: i32 = bounds.top_left.y
+            + (graph_height - (((sample[0] - y_min) / y_range) * graph_height)).to_num::<i32>();
+        let x_pos_end: i32 = bounds.top_left.x
+            + (((n_samples_seen + U16F16::from_num(1)) / n_samples)
+                * (graph_width - U16F16::from_num(1)))
+            .to_num::<i32>();
+        let y_pos_end: i32 = bounds.top_left.y
+            + (graph_height - (((sample[1] - y_min) / y_range) * graph_height)).to_num::<i32>();
+
+        let _ = Line::new(
+            Point::new(x_pos_start, y_pos_start),
+            Point::new(x_pos_end, y_pos_end),
+        )
+        .into_styled(PrimitiveStyle::with_stroke(fg_colour, 1))
+        .draw(target);
+
+        x_offset = x_pos_end;
+        n_samples_seen += U16F16::from_num(1);
+    }
+
+    return;
 }

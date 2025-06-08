@@ -2,16 +2,17 @@
 #![no_main]
 
 mod display_task;
+mod input_task;
 mod sensor_task;
 
 use core::cell::RefCell;
 
-use rtt_target::{rprintln, rtt_init_print};
+use rtt_target::{debug_rprintln, debug_rtt_init_print};
 
 use embassy_executor::Spawner;
 use embassy_rp::{
     block::ImageDef,
-    gpio::{Level, Output},
+    gpio::{Input, Level, Output, Pull},
     i2c,
     peripherals::{I2C0, SPI0},
     spi,
@@ -27,6 +28,7 @@ use embassy_time::Timer;
 use static_cell::StaticCell;
 
 use display_task::display_output_task;
+use input_task::input_handling_task;
 use sensor_task::sensor_read_task;
 
 type I2c0BusMutex = Mutex<NoopRawMutex, RefCell<i2c::I2c<'static, I2C0, i2c::Blocking>>>;
@@ -41,11 +43,11 @@ static SENSOR_DATA_SIGNAL: Signal<CriticalSectionRawMutex, scd4x::types::SensorD
 
 /// Entrypoint
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn main(spawner: Spawner) -> ! {
     // Initialise RTT logging
 
-    rtt_init_print!();
-    rprintln!("RTT logging initialised");
+    debug_rtt_init_print!();
+    debug_rprintln!("RTT logging initialised");
 
     let peripherals = embassy_rp::init(Default::default());
 
@@ -70,7 +72,7 @@ async fn main(spawner: Spawner) {
     let rst = SPI0_RST_PIN.init(Output::new(peripherals.PIN_15, Level::Low));
 
     let mut spi_config = spi::Config::default();
-    spi_config.frequency = 4_000_000u32; // 4 MHz
+    spi_config.frequency = 20_000_000u32; // 20 MHz
     let spi_bus = spi::Spi::new_blocking_txonly(peripherals.SPI0, sclk, mosi, spi_config.clone());
     static SPI0_BUS: StaticCell<Spi0BusMutex> = StaticCell::new();
     let shared_spi0_bus = SPI0_BUS.init(Mutex::new(RefCell::new(spi_bus)));
@@ -84,6 +86,11 @@ async fn main(spawner: Spawner) {
         spi_config.clone(),
     ));
 
+    let enter_button = Input::new(peripherals.PIN_8, Pull::Up);
+    let left_button = Input::new(peripherals.PIN_6, Pull::Up);
+    let right_button = Input::new(peripherals.PIN_7, Pull::Up);
+    spawner.must_spawn(input_handling_task(enter_button, left_button, right_button));
+
     loop {
         Timer::after_secs(1).await;
     }
@@ -92,7 +99,7 @@ async fn main(spawner: Spawner) {
 /// Panic handler
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    rprintln!("Panicked! {}", info);
+    debug_rprintln!("Panicked! {}", info);
 
     loop {
         unsafe {
