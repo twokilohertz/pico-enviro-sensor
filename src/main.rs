@@ -86,13 +86,14 @@ async fn main(spawner: Spawner) -> ! {
         spi_config.clone(),
     ));
 
+    // Start user input handling task, with the pins of the three buttons
     let enter_button = Input::new(peripherals.PIN_8, Pull::Up);
     let left_button = Input::new(peripherals.PIN_6, Pull::Up);
     let right_button = Input::new(peripherals.PIN_7, Pull::Up);
     spawner.must_spawn(input_handling_task(enter_button, left_button, right_button));
 
     loop {
-        Timer::after_secs(1).await;
+        Timer::after_secs(3600).await;
     }
 }
 
@@ -102,9 +103,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     debug_rprintln!("Panicked! {}", info);
 
     loop {
-        unsafe {
-            core::arch::asm!("wfi");
-        }
+        cortex_m::asm::wfi();
     }
 }
 

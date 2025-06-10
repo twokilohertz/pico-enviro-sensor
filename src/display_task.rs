@@ -18,7 +18,7 @@ use ssd1351::{
 // Graphics
 use embedded_graphics::{
     draw_target::DrawTarget,
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
+    mono_font::{ascii::FONT_6X10, MonoTextStyleBuilder},
     pixelcolor::{Rgb565, Rgb888},
     prelude::{Point, Primitive, RgbColor, Size, WebColors},
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
@@ -35,6 +35,15 @@ use crate::{Spi0BusMutex, SENSOR_DATA_SIGNAL};
 const DISPLAY_WIDTH: usize = 128;
 const DISPLAY_HEIGHT: usize = 128;
 const DISPLAY_PADDING: usize = 5;
+const LINE_GRAPH_WIDTH: u32 = (DISPLAY_WIDTH - (DISPLAY_PADDING * 2)) as u32;
+const LINE_GRAPH_HEIGHT: u32 = 36;
+const CO2_TEXT_X: i32 = DISPLAY_PADDING as i32 + 1;
+const CO2_TEXT_Y: i32 = DISPLAY_PADDING as i32 + LINE_GRAPH_HEIGHT as i32;
+const TEMP_TEXT_X: i32 = CO2_TEXT_X;
+const TEMP_TEXT_Y: i32 = (DISPLAY_PADDING as i32 + LINE_GRAPH_HEIGHT as i32) * 2;
+const HUMID_TEXT_X: i32 = CO2_TEXT_X;
+const HUMID_TEXT_Y: i32 = (DISPLAY_PADDING as i32 + LINE_GRAPH_HEIGHT as i32) * 3;
+
 type SensorDataBuffer = CircularBuffer<60, U16F16>;
 
 /// Output to the SSD1351 display
@@ -65,13 +74,26 @@ pub async fn display_output_task(
     let mut framebuf = FrameBuf::new(buf, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
     // Text styles
-    let align_l_base_bottom = TextStyleBuilder::new()
+    let text_style = TextStyleBuilder::new()
         .alignment(Alignment::Left)
         .baseline(embedded_graphics::text::Baseline::Bottom)
         .build();
-    let co2_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_FOREST_GREEN);
-    let temp_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_ORANGE_RED);
-    let humidity_text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_AQUAMARINE);
+    let drop_shadow_style = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(Rgb565::BLACK)
+        .build();
+    let co2_style = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(Rgb565::CSS_FOREST_GREEN)
+        .build();
+    let temp_style = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(Rgb565::CSS_ORANGE_RED)
+        .build();
+    let humidity_style = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(Rgb565::CSS_DARK_CYAN)
+        .build();
 
     // Format string buffers
     let mut co2_text_buf = String::<20>::new();
@@ -122,9 +144,6 @@ pub async fn display_output_task(
 
         // Draw line graphs
 
-        const LINE_GRAPH_WIDTH: u32 = (DISPLAY_WIDTH - (DISPLAY_PADDING * 2)) as u32;
-        const LINE_GRAPH_HEIGHT: u32 = 36;
-
         draw_line_graph(
             Rectangle::new(
                 Point::new(DISPLAY_PADDING as i32, DISPLAY_PADDING as i32),
@@ -174,27 +193,54 @@ pub async fn display_output_task(
 
         Text::with_text_style(
             &co2_text_buf,
-            Point::new(5, 34),
-            co2_text_style,
-            align_l_base_bottom,
+            Point::new(CO2_TEXT_X + 1, CO2_TEXT_Y + 1),
+            drop_shadow_style,
+            text_style,
+        )
+        .draw(&mut framebuf)
+        .unwrap();
+
+        Text::with_text_style(
+            &co2_text_buf,
+            Point::new(CO2_TEXT_X, CO2_TEXT_Y),
+            co2_style,
+            text_style,
         )
         .draw(&mut framebuf)
         .unwrap();
 
         Text::with_text_style(
             &temp_text_buf,
-            Point::new(5, 68),
-            temp_text_style,
-            align_l_base_bottom,
+            Point::new(TEMP_TEXT_X + 1, TEMP_TEXT_Y + 1),
+            drop_shadow_style,
+            text_style,
+        )
+        .draw(&mut framebuf)
+        .unwrap();
+
+        Text::with_text_style(
+            &temp_text_buf,
+            Point::new(TEMP_TEXT_X, TEMP_TEXT_Y),
+            temp_style,
+            text_style,
         )
         .draw(&mut framebuf)
         .unwrap();
 
         Text::with_text_style(
             &humidity_text_buf,
-            Point::new(5, 102),
-            humidity_text_style,
-            align_l_base_bottom,
+            Point::new(HUMID_TEXT_X + 1, HUMID_TEXT_Y + 1),
+            drop_shadow_style,
+            text_style,
+        )
+        .draw(&mut framebuf)
+        .unwrap();
+
+        Text::with_text_style(
+            &humidity_text_buf,
+            Point::new(HUMID_TEXT_X, HUMID_TEXT_Y),
+            humidity_style,
+            text_style,
         )
         .draw(&mut framebuf)
         .unwrap();
