@@ -30,3 +30,9 @@ The [env-vars.sh](./scripts/env-vars.sh) script sets these values to `pico2_w`, 
 If you wish to run the binary on your Pico (connected in BOOTSEL mode):
 
 - `cargo run` (or `cargo run --release`)
+
+### TODO / Future improvements
+
+- Companion smartphone app using BLE to receive measurement data from the device for notifications & further analysis/tracking
+- Low-power state, reducing screen brightness, sensor sampling rate and putting periphals to sleep
+- 3D printed case housing the MCU, sensor, display and rechargable lithium ion battery
