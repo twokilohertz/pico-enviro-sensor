@@ -9,29 +9,32 @@ The effects of increased CO₂ concentration on cognitive function become increa
 ### Prerequisites
 
 - Rust compiler & cargo package manager: https://www.rust-lang.org/
-- RPi Pico SDK: https://github.com/raspberrypi/pico-sdk
-- RPi picotool: https://github.com/raspberrypi/picotool
+- [probe-rs](https://probe.rs/) for programming the device, receiving RTT logging output & debugging
 - ARM bare metal compiler toolchain
     - `arm-none-eabi-gcc` (& `arm-none-eabi-newlib`) on Arch Linux, your system may have different package names
 - The ARMv8 or RISC-V Rust toolchain:
   - ARMv8: `rustup target add thumbv8m.main-none-eabihf`
   - RISC-V: `rustup target add riscv32imac-unknown-none-elf`
 
-### Environment configuration
+### Notes
 
-This build system assumes the environment variables: `PICO_BOARD`, `PICO_PLATFORM` & `PICO_SDK_PATH` are set. `picotool` should also be available in the `PATH`.
+This project's [`Cargo.toml`](./Cargo.toml) includes a custom build profile ("`dist`") which optimises the executable for maximum performance at the cost of slower build times. This profile is designed for flashing a final build onto an end user's device.
 
-The [env-vars.sh](./scripts/env-vars.sh) script sets these values to `pico2_w`, `rp2350-arm-s` and my personal Pico SDK path, respectively. The environment variable definitions in this file can be set with `source ./scripts/env-vars.sh`.
+By install probe-rs as mentioned in the prerequisities you will have access to `cargo flash` and `cargo embed` for flashing the executable onto the device.
 
 ### Compiling & running
 
-- `cargo build` (or `cargo build --release`)
+- `cargo build` (or `cargo build --release` / `cargo build --profile dist`)
 
 If you wish to run the binary on your Pico (connected in BOOTSEL mode):
 
-- `cargo run` (or `cargo run --release`)
+- `cargo run` (or `cargo run --release` / `cargo run --profile dist`)
 
-### TODO / Future improvements
+## Hacking & debugging
+
+This project uses probe-rs for flashing & debugging, though one may use `picotool` and `OpenOCD` instead if you so wish. Ensure that you have a debug probe which supports to RP235x series of chips and supports the SWD protocol. I use the Raspberry Pi debug probe (USB VID:PID `2e8a:000c`) for debugging the device using the on-board debugging pins. 
+
+## TODO / Future improvements
 
 - Companion smartphone app using BLE to receive measurement data from the device for notifications & further analysis/tracking
 - Low-power state, reducing screen brightness, sensor sampling rate and putting periphals to sleep
