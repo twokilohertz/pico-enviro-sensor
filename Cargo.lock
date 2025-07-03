@@ -2000,8 +2000,7 @@ dependencies = [
 [[package]]
 name = "scd4x"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550fedc97e7880654aa7dc840f5eb3b2201a01aae566c4584a3601bb0086cd4c"
+source = "git+https://github.com/twokilohertz/scd4x-rs.git?branch=self-calib-tgt#3ec7b975b32ed8ec47c71ecee3711f430871bd2e"
 dependencies = [
  "embedded-hal 1.0.0",
  "log",

@@ -8,10 +8,14 @@ use scd4x::Scd4x;
 
 use crate::{I2c0BusMutex, SENSOR_DATA_SIGNAL};
 
+const BACKGROUND_CO2_PPM: u16 = 427;
+
 /// Read CO2/temp./humidity data from the sensor
 #[embassy_executor::task]
 pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
     debug_rprintln!("Sensor read task started");
+
+    // Initialise SCD41
 
     Timer::after_millis(30).await; // SCD41 power-up delay
     let i2c_dev = I2cDevice::new(i2c_bus);
@@ -20,6 +24,11 @@ pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
     scd41.wake_up();
     scd41.reinit().unwrap();
 
+    // https://climate.nasa.gov/vital-signs/carbon-dioxide/?intent=121
+    scd41
+        .set_automatic_self_calibration_target(BACKGROUND_CO2_PPM)
+        .unwrap();
+
     match scd41.serial_number() {
         Ok(serial) => debug_rprintln!("[SCD41] Serial number: {}", serial),
         Err(error) => debug_rprintln!(
@@ -27,6 +36,8 @@ pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
             error
         ),
     }
+
+    // Measurement loop
 
     scd41.start_periodic_measurement().unwrap();
 
@@ -53,4 +64,6 @@ pub async fn sensor_read_task(i2c_bus: &'static I2c0BusMutex) {
             }
         }
     }
+
+    scd41.stop_periodic_measurement().unwrap();
 }
