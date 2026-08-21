@@ -11,7 +11,3 @@ rustflags = [
     "target-cpu=cortex-m33",
 ]
 runner = "probe-rs run --chip RP235x"
-
-[target.riscv32imac-unknown-none-elf]
-rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Trp235x_riscv.x"]
-runner = "probe-rs run --chip RP235x"

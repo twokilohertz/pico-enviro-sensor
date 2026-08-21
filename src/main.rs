@@ -1,125 +1,123 @@
 #![no_std]
 #![no_main]
 
-mod display_task;
-mod input_task;
-mod sensor_task;
-
-use core::cell::RefCell;
-
-use rtt_target::{debug_rprintln, debug_rtt_init_print};
+use core::{cell::RefCell, panic};
 
 use embassy_executor::Spawner;
 use embassy_rp::{
     block::ImageDef,
-    gpio::{Input, Level, Output, Pull},
+    gpio::{Level, Output},
     i2c,
     peripherals::{I2C0, SPI0},
     spi,
 };
-use embassy_sync::{
-    blocking_mutex::{
-        raw::{CriticalSectionRawMutex, NoopRawMutex},
-        Mutex,
-    },
-    signal::Signal,
-};
-use embassy_time::Timer;
+use embassy_sync::blocking_mutex::{Mutex, raw::NoopRawMutex};
+use rtt_target::debug_rprintln;
 use static_cell::StaticCell;
 
-use display_task::display_output_task;
-use input_task::input_handling_task;
-use sensor_task::sensor_read_task;
+use crate::messages::{Message, MessageBus};
 
-type I2c0BusMutex = Mutex<NoopRawMutex, RefCell<i2c::I2c<'static, I2C0, i2c::Blocking>>>;
-type Spi0BusMutex = Mutex<NoopRawMutex, RefCell<spi::Spi<'static, SPI0, spi::Blocking>>>;
+mod messages;
+mod tasks;
 
-embassy_rp::bind_interrupts!(struct Irqs {
-    I2C0_IRQ => embassy_rp::i2c::InterruptHandler<embassy_rp::peripherals::I2C0>;
-});
-
-static SENSOR_DATA_SIGNAL: Signal<CriticalSectionRawMutex, scd4x::types::SensorData> =
-    Signal::new();
+// Not currently using multiple executors & only one device is on the SPI/I2C bus
+type SpiBus0 = Mutex<NoopRawMutex, RefCell<spi::Spi<'static, SPI0, spi::Blocking>>>;
+type I2cBus0 = Mutex<NoopRawMutex, RefCell<i2c::I2c<'static, I2C0, i2c::Blocking>>>;
 
 /// Entrypoint
-#[embassy_executor::main]
-async fn main(spawner: Spawner) -> ! {
-    // Initialise RTT logging
+#[embassy_executor::main()]
+async fn main(spawner: Spawner) {
+    // Initialise logging (debug mode)
 
-    debug_rtt_init_print!();
-    debug_rprintln!("RTT logging initialised");
+    rtt_target::debug_rtt_init_print!();
+    debug_rprintln!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-    let peripherals = embassy_rp::init(Default::default());
+    let p = embassy_rp::init(Default::default());
 
-    // Initialise I2C0 (SDA: pin 4, SCL: pin 5)
-    let sda = peripherals.PIN_4;
-    let scl = peripherals.PIN_5;
-    let mut i2c_config = embassy_rp::i2c::Config::default();
-    i2c_config.frequency = 400_000u32; // 400 kHz
-    let i2c_bus = embassy_rp::i2c::I2c::new_blocking(peripherals.I2C0, scl, sda, i2c_config);
-    static I2C0_BUS: StaticCell<I2c0BusMutex> = StaticCell::new();
-    let shared_i2c0_bus = I2C0_BUS.init(Mutex::new(RefCell::new(i2c_bus)));
+    // -- Configure peripherals
 
-    // Start new task for reading data from the sensor
-    spawner.must_spawn(sensor_read_task(shared_i2c0_bus));
+    // I2C sensor configuration
 
-    // Initialise SPI0 (MOSI: pin 19, SCLK: pin 18, CS: pin 17, DC: pin 14, RST: pin 15)
-    let mosi = peripherals.PIN_19;
-    let sclk = peripherals.PIN_18;
-    let cs = Output::new(peripherals.PIN_17, Level::Low);
-    let dc = Output::new(peripherals.PIN_14, Level::Low);
-    static SPI0_RST_PIN: StaticCell<Output<'_>> = StaticCell::new(); // Initialised before launching task
-    let rst = SPI0_RST_PIN.init(Output::new(peripherals.PIN_15, Level::Low));
+    let i2c_config = {
+        let mut cfg = i2c::Config::default();
+        cfg.frequency = 400_000; // 400 KHz
+        cfg
+    };
 
-    let mut spi_config = spi::Config::default();
-    spi_config.frequency = 20_000_000u32; // 20 MHz
-    let spi_bus = spi::Spi::new_blocking_txonly(peripherals.SPI0, sclk, mosi, spi_config.clone());
-    static SPI0_BUS: StaticCell<Spi0BusMutex> = StaticCell::new();
-    let shared_spi0_bus = SPI0_BUS.init(Mutex::new(RefCell::new(spi_bus)));
+    let sda = p.PIN_12;
+    let scl = p.PIN_13;
+    let i2c = embassy_rp::i2c::I2c::new_blocking(p.I2C0, scl, sda, i2c_config);
+    static I2C0_BUS: StaticCell<I2cBus0> = StaticCell::new();
+    let i2c_bus = I2C0_BUS.init(Mutex::new(RefCell::new(i2c)));
 
-    // Start new task for outputting to the display
-    spawner.must_spawn(display_output_task(
-        shared_spi0_bus,
-        cs,
-        dc,
-        rst,
-        spi_config.clone(),
-    ));
+    // SPI display configuration
 
-    // Start user input handling task, with the pins of the three buttons
-    let enter_button = Input::new(peripherals.PIN_8, Pull::Up);
-    let left_button = Input::new(peripherals.PIN_6, Pull::Up);
-    let right_button = Input::new(peripherals.PIN_7, Pull::Up);
-    spawner.must_spawn(input_handling_task(enter_button, left_button, right_button));
+    let spi_peripheral = p.SPI0;
+    let spi_clk = p.PIN_18;
+    let spi_mosi = p.PIN_19;
+    let spi_cs = Output::new(p.PIN_21, Level::High);
 
-    loop {
-        Timer::after_secs(3600).await;
-    }
+    let dc = Output::new(p.PIN_16, Level::Low);
+    let rst = Output::new(p.PIN_17, Level::High);
+
+    let spi_config = {
+        let mut cfg = spi::Config::default();
+        cfg.frequency = 60_000_000; // theorhetical ~62.5 MHz maximum (60 MHz for safety)
+        cfg
+    };
+
+    let spi = spi::Spi::new_blocking_txonly(spi_peripheral, spi_clk, spi_mosi, spi_config);
+
+    static SPI_BUS: StaticCell<SpiBus0> = StaticCell::new();
+    let spi_bus = SPI_BUS.init(Mutex::new(spi.into()));
+
+    // -- Invoke tasks
+
+    // System-wide message bus
+    static MESSAGE_BUS: StaticCell<MessageBus> = StaticCell::new();
+    let message_bus = MESSAGE_BUS.init(MessageBus::new());
+
+    // Sensor read
+    spawner.spawn(tasks::sensor::sensor_read(i2c_bus, message_bus.publisher().unwrap()).unwrap());
+
+    // Display output
+    spawner.spawn(
+        tasks::display::display_output(spi_bus, spi_cs, dc, rst, message_bus.subscriber().unwrap())
+            .unwrap(),
+    );
+
+    // Alert all tasks listening on the message bus that the system has initialised & started
+
+    message_bus
+        .publisher()
+        .unwrap()
+        .publish(Message::Startup)
+        .await;
 }
 
-/// Panic handler
 #[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    debug_rprintln!("Panicked! {}", info);
-
-    loop {
-        cortex_m::asm::wfi();
-    }
+fn panic(panic: &panic::PanicInfo) -> ! {
+    debug_rprintln!("{}", panic);
+    cortex_m::asm::udf();
 }
 
 /// Executable type header for the RP2350 bootloader
-#[link_section = ".start_block"]
+#[unsafe(link_section = ".start_block")]
 #[used]
-static IMAGE_DEF: ImageDef = ImageDef::secure_exe();
+pub static IMAGE_DEF: ImageDef = ImageDef::secure_exe();
 
 /// Program metadata for picotool
-#[link_section = ".bi_entries"]
+#[unsafe(link_section = ".bi_entries")]
 #[used]
-pub static PICOTOOL_ENTRIES: [embassy_rp::binary_info::EntryAddr; 4] = [
-    embassy_rp::binary_info::rp_program_name!(c"Pico Environment Sensor"),
-    embassy_rp::binary_info::rp_program_description!(
-        c"CO2, temperature & humidity sensing application for the RPi Pico 2 W"
-    ),
+pub static PICOTOOL_ENTRIES: [embassy_rp::binary_info::EntryAddr; 6] = [
+    embassy_rp::binary_info::rp_program_name!(c"Pico Enviro Sensor"),
+    embassy_rp::binary_info::rp_program_description!(unsafe {
+        core::ffi::CStr::from_bytes_with_nul_unchecked(
+            concat!(env!("CARGO_PKG_DESCRIPTION"), "\0").as_bytes(), // See: https://github.com/rp-rs/rp-hal/pull/1003
+        )
+    }),
     embassy_rp::binary_info::rp_cargo_version!(),
     embassy_rp::binary_info::rp_program_build_attribute!(),
+    embassy_rp::binary_info::rp_cargo_homepage_url!(),
+    embassy_rp::binary_info::rp_pico_board!(c"Raspberry Pi Pico 2 W"),
 ];
