@@ -8,7 +8,7 @@ The effects of increased CO₂ concentration on cognitive function becomes incre
 
 - Microcontroller: [Raspberry Pi Pico 2 W (RP2350)](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#wireless_pico2)
   - Datasheet (board): https://pip.raspberrypi.com/documents/RP-008304-DS
-  - Datashet (chip): https://pip.raspberrypi.com/documents/RP-008373-DS
+  - Datasheet (chip): https://pip.raspberrypi.com/documents/RP-008373-DS
 - Environment sensor: [Sensirion SCD41](https://sensirion.com/products/catalog/SCD41)
   - Datasheet: https://sensirion.com/resource/datasheet/scd4x
 - Display: [GoldenMorning GMT020-02 ST7789V](https://goldenmorninglcd.com/tft-display-module/2-inch-240x320-st7789v-gmt020-02/)
