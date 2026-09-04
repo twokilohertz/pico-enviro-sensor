@@ -1,75 +1,68 @@
 [package]
 name = "pico-enviro-sensor"
-description = "Firmware for RPi Pico 2 W-based environment sensor"
-authors = ["Adam Macdonald"]
-homepage = "https://github.com/twokilohertz/pico-enviro-sensor"
+version = "0.2.0"
+description = "Firmware for RP235x-based environment sensing device"
+authors = ["Adam Macdonald <adam@2khz.xyz>"]
+repository = "https://git.2khz.xyz/adam/pico-enviro-sensor"
+readme = "README.md"
 license = "MIT"
-version = "0.1.0"
-edition = "2021"
+rust-version = "1.95"
+edition = "2024"
+publish = false
 
 [dependencies]
+# Hardware
+cortex-m = { version = "0.7", features = ["critical-section"] }
+cortex-m-rt = { version = "0.7" }
 # Embassy
-embassy-rp = { version = "0.4.0", features = [
+embassy-rp = { version = "0.10", features = [
     "rp235xa",
     "binary-info",
+    "imagedef-none",
     "critical-section-impl",
     "time-driver",
 ] }
-embassy-executor = { version = "0.7.0", features = [
-    "arch-cortex-m",
+embassy-executor = { version = "0.10", features = [
+    "platform-cortex-m",
     "executor-thread",
     "executor-interrupt",
-    "task-arena-size-65536",
 ] }
-embassy-time = "0.4.0"
-embassy-embedded-hal = "0.3.0"
-embassy-futures = "0.1.1"
-embassy-sync = "0.6.2" # TODO: Update when embassy-embedded-hal on crates.io is tracking 0.7.0
-trouble-host = { version = "0.1.0", default-features = false, features = [
-    "peripheral",
-    "gatt",
-    "derive",
-] }
-
-# System
-cortex-m-rt = "0.7.5"
-cortex-m = "0.7.7"
-critical-section = "1.2.0"
-cyw43 = { version = "0.3.0", features = ["bluetooth"] }
-cyw43-pio = "0.4.0"
-rtt-target = "0.6.1"
-
-# embedded-graphics
-embedded-graphics = "0.8.1"
-embedded-graphics-framebuf = "0.5.0"
-
-# Peripherals
-scd4x = { version = "0.4.1", features = ["scd41"] }
-ssd1351 = "0.5.0"
-display-interface-spi = "0.5.0"
-
-# Extra
-static_cell = "2.1.0"
-heapless = "0.8.0"
-circular-buffer = { version = "1.1.0", default-features = false }
-fixed = "1.29.0"
-
-[build-dependencies]
-reqwest = { version = "0.12.20", features = ["blocking"] }
-
-[features]
-# Skips downloading the Wi-Fi & Bluetooth chipset firmware, assumes that it is in `./cyw43-firmware`
-skip-cyw43-firmware = []
+embassy-futures = { version = "0.1" }
+embassy-sync = { version = "0.8" }
+embassy-time = { version = "0.5" }
+embassy-embedded-hal = { version = "0.6" }
+# Graphics
+embedded-graphics = { version = "0.8" }
+embedded-graphics-framebuf = { version = "0.5" }
+# Drivers
+scd4x = { git = "https://github.com/twokilohertz/scd4x-rs.git", branch = "develop", features = [
+    "scd41",
+    "fixed",
+] } # Sensor
+mipidsi = { version = "0.10" } # Display
+# Containers
+heapless = { version = "0.9", default-features = false }
+circular-buffer = { version = "2.0", default-features = false }
+# Utilities
+static_cell = { version = "2.1", default-features = false }
+fixed = { version = "1" }
+tinybmp = { version = "0.7" }
+# Debugging
+rtt-target = { version = "0.6" }
 
 [profile.dev]
 opt-level = "s"
+strip = "none"
 
-# Super-optimised release build, maximum performance, minimal debuggability
-# Build with cargo build --profile dist
 [profile.dist]
 inherits = "release"
 opt-level = 3
 strip = "symbols"
 lto = "fat"
+panic = "abort"
 overflow-checks = false
 codegen-units = 1
+
+[profile.dist-dev]
+inherits = "dist"
+strip = "none"

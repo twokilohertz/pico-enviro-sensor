@@ -1,8 +1,8 @@
 # Cargo
-target/
+**/target
 
 # Firmware blobs
-cyw43-firmware/
+**/cyw43-firmware
 
 # VSCode
-.vscode
+/.vscode
