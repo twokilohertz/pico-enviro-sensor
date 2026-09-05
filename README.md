@@ -4,6 +4,10 @@ This firmware, written in Rust using [Embassy](https://github.com/embassy-rs/emb
 
 The effects of increased CO₂ concentration on cognitive function becomes increasingly pronounced at CO₂ concentrations exceeding 1000 ppm. There's a fantastic [YouTube video](https://www.youtube.com/watch?v=1Nh_vxpycEA) by Kurtis Baute and Tom Scott which you can watch for a short summary. Open your window right now!
 
+![A screenshot of the firmware running on device, displaying the three environment monitoring metrics & graphs](./doc/res/screenshot.png)
+
+*Captured on real hardware!* Note the slight green tint is owing to the fact that the device uses RGB565 for pixel values internally, then the screenshot was converted to RGB888 for displaying on this page.
+
 ## Hardware
 
 - Microcontroller: [Raspberry Pi Pico 2 W (RP2350)](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#wireless_pico2)
