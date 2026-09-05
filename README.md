@@ -35,7 +35,7 @@ This project's [`Cargo.toml`](./Cargo.toml) includes a custom build profile ("`d
 
 **The project's build profile also overrides the default Rust "`dev`" profile with `opt-level = "s"`.** If this is undesirable for debugging purposes - as the compiler can optimise out quite a lot of useful information in this mode - it is recommended to remove this optimisation directive.
 
-By install probe-rs as mentioned in the prerequisities you will have access to `cargo flash` and `cargo embed` for flashing the executable onto the device.
+By installing probe-rs as mentioned in the prerequisities you will have access to `cargo flash` and `cargo embed` for flashing the executable onto the device.
 
 ### Compiling & running
 
